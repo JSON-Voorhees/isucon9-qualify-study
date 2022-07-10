@@ -1164,6 +1164,10 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 	}
 	wg.Wait()
 	log.Printf("results: %+v\n", results)
+
+	for i := range itemDetails {
+		log.Printf("item[%d] = %+v\n", i, itemDetails[i])
+	}
 	if lastErr != nil {
 		log.Print(lastErr)
 		outputErrorMsg(w, http.StatusInternalServerError, "failed to request to shipment service: "+lastErr.Error())
