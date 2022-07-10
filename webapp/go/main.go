@@ -574,7 +574,7 @@ func getNewItems(w http.ResponseWriter, r *http.Request) {
 	// userの取得
 	sellers, err := getUserByUserIdList(dbx, sellerIdList)
 	if err != nil {
-		outputErrorMsg(w, http.StatusNotFound, "seller not found")
+		outputErrorMsg(w, http.StatusNotFound, "seller not found:"+err.Error())
 		return
 	}
 
@@ -718,7 +718,7 @@ func getNewCategoryItems(w http.ResponseWriter, r *http.Request) {
 	// userの取得
 	sellers, err := getUserByUserIdList(dbx, sellerIdList)
 	if err != nil {
-		outputErrorMsg(w, http.StatusNotFound, "seller not found")
+		outputErrorMsg(w, http.StatusNotFound, "seller not found:"+err.Error())
 		return
 	}
 
@@ -964,13 +964,13 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 	// userの取得
 	sellers, err := getUserByUserIdList(dbx, sellerIdList)
 	if err != nil {
-		outputErrorMsg(w, http.StatusNotFound, "seller not found")
+		outputErrorMsg(w, http.StatusNotFound, "seller not found:"+err.Error())
 		tx.Rollback()
 		return
 	}
 	buyers, err := getUserByUserIdList(dbx, buyerIdList)
 	if err != nil {
-		outputErrorMsg(w, http.StatusNotFound, "buyer not found")
+		outputErrorMsg(w, http.StatusNotFound, "buyer not found:"+err.Error())
 		tx.Rollback()
 		return
 	}
