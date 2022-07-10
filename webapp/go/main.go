@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -407,6 +408,26 @@ func getUserSimpleByID(q sqlx.Queryer, userID int64) (userSimple UserSimple, err
 	return userSimple, err
 }
 
+func getUserMapByUserIdList(q sqlx.Queryer, userIdList []string) (userSimplesMap map[int64]UserSimple, err error) {
+	if len(userIdList) == 0 {
+		return map[int64]UserSimple{}, nil
+	}
+
+	users := []User{}
+	err = sqlx.Select(q, &users, "SELECT * FROM `users` WHERE `id` in ("+strings.Join(userIdList, ",")+")")
+
+	userSimplesMap = make(map[int64]UserSimple, len(users))
+	for _, user := range users {
+		userSimplesMap[user.ID] = UserSimple{
+			ID:           user.ID,
+			AccountName:  user.AccountName,
+			NumSellItems: user.NumSellItems,
+		}
+	}
+
+	return userSimplesMap, err
+}
+
 func getCategoryByID(q sqlx.Queryer, categoryID int) (category Category, err error) {
 	err = sqlx.Get(q, &category, "SELECT * FROM `categories` WHERE `id` = ?", categoryID)
 	if category.ParentID != 0 {
@@ -557,13 +578,23 @@ func getNewItems(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// 検索用userIdのリスト作成
+	sellerIdList := make([]string, len(items))
+	for idx, item := range items {
+		sellerIdList[idx] = strconv.FormatInt(item.SellerID, 10)
+	}
+
+	// userの取得
+	sellersMap, err := getUserMapByUserIdList(dbx, sellerIdList)
+	if err != nil {
+		outputErrorMsg(w, http.StatusNotFound, "seller not found:"+err.Error())
+		return
+	}
+
 	itemSimples := []ItemSimple{}
 	for _, item := range items {
-		seller, err := getUserSimpleByID(dbx, item.SellerID)
-		if err != nil {
-			outputErrorMsg(w, http.StatusNotFound, "seller not found")
-			return
-		}
+		seller := sellersMap[item.SellerID]
+
 		category, err := getCategoryByID(dbx, item.CategoryID)
 		if err != nil {
 			outputErrorMsg(w, http.StatusNotFound, "category not found")
@@ -685,13 +716,22 @@ func getNewCategoryItems(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 検索用userIdのリスト作成
+	sellerIdList := make([]string, len(items))
+	for idx, item := range items {
+		sellerIdList[idx] = strconv.FormatInt(item.SellerID, 10)
+	}
+
+	// userの取得
+	sellersMap, err := getUserMapByUserIdList(dbx, sellerIdList)
+	if err != nil {
+		outputErrorMsg(w, http.StatusNotFound, "seller not found:"+err.Error())
+		return
+	}
+
 	itemSimples := []ItemSimple{}
 	for _, item := range items {
-		seller, err := getUserSimpleByID(dbx, item.SellerID)
-		if err != nil {
-			outputErrorMsg(w, http.StatusNotFound, "seller not found")
-			return
-		}
+		seller := sellersMap[item.SellerID]
 		category, err := getCategoryByID(dbx, item.CategoryID)
 		if err != nil {
 			outputErrorMsg(w, http.StatusNotFound, "category not found")
@@ -912,14 +952,33 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// 検索用userIdのリスト作成
+	sellerIdList := make([]string, len(items))
+	buyerIdList := make([]string, 0, len(items))
+	for idx, item := range items {
+		sellerIdList[idx] = strconv.FormatInt(item.SellerID, 10)
+		if item.BuyerID != 0 {
+			buyerIdList = append(buyerIdList, strconv.FormatInt(item.BuyerID, 10))
+		}
+	}
+
+	// userの取得
+	sellersMap, err := getUserMapByUserIdList(dbx, sellerIdList)
+	if err != nil {
+		outputErrorMsg(w, http.StatusNotFound, "seller not found:"+err.Error())
+		tx.Rollback()
+		return
+	}
+	buyersMap, err := getUserMapByUserIdList(dbx, buyerIdList)
+	if err != nil {
+		outputErrorMsg(w, http.StatusNotFound, "buyer not found:"+err.Error())
+		tx.Rollback()
+		return
+	}
+
 	itemDetails := []ItemDetail{}
 	for _, item := range items {
-		seller, err := getUserSimpleByID(tx, item.SellerID)
-		if err != nil {
-			outputErrorMsg(w, http.StatusNotFound, "seller not found")
-			tx.Rollback()
-			return
-		}
+		seller := sellersMap[item.SellerID]
 		category, err := getCategoryByID(tx, item.CategoryID)
 		if err != nil {
 			outputErrorMsg(w, http.StatusNotFound, "category not found")
@@ -947,12 +1006,7 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if item.BuyerID != 0 {
-			buyer, err := getUserSimpleByID(tx, item.BuyerID)
-			if err != nil {
-				outputErrorMsg(w, http.StatusNotFound, "buyer not found")
-				tx.Rollback()
-				return
-			}
+			buyer := buyersMap[item.BuyerID]
 			itemDetail.BuyerID = item.BuyerID
 			itemDetail.Buyer = &buyer
 		}
