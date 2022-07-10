@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -1006,14 +1007,12 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 	} else {
 		// 1st page
 		err := tx.Select(&items,
-			"SELECT * FROM `items` WHERE (`seller_id` = ? OR `buyer_id` = ?) AND `status` IN (?,?,?,?,?) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
+			"(SELECT * FROM `items` WHERE `seller_id` = ? ORDER BY `created_at` DESC, `id` DESC LIMIT ?)"+
+				"UNION"+
+				"(SELECT * FROM `items` WHERE `buyer_id` = ? ORDER BY `created_at` DESC, `id` DESC LIMIT ?)",
 			user.ID,
+			TransactionsPerPage+1,
 			user.ID,
-			ItemStatusOnSale,
-			ItemStatusTrading,
-			ItemStatusSoldOut,
-			ItemStatusCancel,
-			ItemStatusStop,
 			TransactionsPerPage+1,
 		)
 		if err != nil {
@@ -1022,6 +1021,23 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 			tx.Rollback()
 			return
 		}
+
+		// sort
+		sort.Slice(items, func(i, j int) bool {
+			item1 := items[i]
+			item2 := items[j]
+
+			if item1.CreatedAt.After(item2.CreatedAt) {
+				return true
+			} else if item1.CreatedAt.Equal(item2.CreatedAt) && item1.ID > item2.ID {
+				return true
+			}
+
+			return false
+		})
+
+		// slice
+		items = items[0 : TransactionsPerPage+1]
 	}
 
 	// 検索用userIdのリスト作成
