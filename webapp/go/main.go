@@ -60,11 +60,9 @@ const (
 	BcryptCost = 10
 )
 
-var {
-	config = map[string]string{
-		"payment_service_url": DefaultPaymentServiceURL,
-		"shipment_service_url": DefaultShipmentServiceURL,
-	}
+var config = map[string]string{
+	"payment_service_url":  DefaultPaymentServiceURL,
+	"shipment_service_url": DefaultShipmentServiceURL,
 }
 
 var (
@@ -557,7 +555,7 @@ func postInitialize(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// キャッシュにのせる
-	config["payment_service_url"]  = ri.PaymentServiceURL
+	config["payment_service_url"] = ri.PaymentServiceURL
 	config["shipment_service_url"] = ri.ShipmentServiceURL
 
 	res := resInitialize{
