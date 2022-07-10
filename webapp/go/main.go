@@ -4,6 +4,7 @@ import (
 	crand "crypto/rand"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
 	"io/ioutil"
@@ -463,12 +464,12 @@ func getCategoryByID(q sqlx.Queryer, categoryID int) (category Category, err err
 	// 	}
 	// 	category.ParentCategoryName = parentCategory.CategoryName
 	// }
-	if (CategoryListByID[categoryID] == nil)
-	{
-		errors.New("not found")
-		return nil, err
+
+	c, ok := CategoryListByID[categoryID]
+	if !ok {
+		return Category{}, errors.New("not found")
 	}
-	return CategoryListByID[categoryID], err
+	return c, err
 }
 
 func getConfigByName(name string) (string, error) {
@@ -653,14 +654,14 @@ func getNewItems(w http.ResponseWriter, r *http.Request) {
 func getNewCategoryItems(w http.ResponseWriter, r *http.Request) {
 
 	CategoryListByParentId := map[int][]int{
-		0: []int{10,20,30,40,50,60},
-		1: []int{2,3,4,5,6},
-		10: []int{11,12,13,14,15},
-		20: []int{21,22,23,24},
-		30: []int{31,32,33,34,35},
-		40: []int{41,42,43,44,45},
-		50: []int{51,52,53,54,55,56},
-		60: []int{61,62,63,64,65,66},
+		0:  []int{10, 20, 30, 40, 50, 60},
+		1:  []int{2, 3, 4, 5, 6},
+		10: []int{11, 12, 13, 14, 15},
+		20: []int{21, 22, 23, 24},
+		30: []int{31, 32, 33, 34, 35},
+		40: []int{41, 42, 43, 44, 45},
+		50: []int{51, 52, 53, 54, 55, 56},
+		60: []int{61, 62, 63, 64, 65, 66},
 	}
 
 	rootCategoryIDStr := pat.Param(r, "root_category_id")
@@ -2225,10 +2226,10 @@ func getSettings(w http.ResponseWriter, r *http.Request) {
 		3:  {ID: 4, ParentID: 1, CategoryName: "コーナーソファー", ParentCategoryName: "ソファー"},
 		4:  {ID: 5, ParentID: 1, CategoryName: "二段ソファー", ParentCategoryName: "ソファー"},
 		5:  {ID: 6, ParentID: 1, CategoryName: "ソファーベッド", ParentCategoryName: "ソファー"},
-		6: {ID: 10, ParentID: 0, CategoryName: "家庭用チェア", ParentCategoryName: ""},
-		7: {ID: 11, ParentID: 10, CategoryName: "スツール", ParentCategoryName: "家庭用チェア"},
-		8: {ID: 12, ParentID: 10, CategoryName: "クッションスツール", ParentCategoryName: "家庭用チェア"},
-		9: {ID: 13, ParentID: 10, CategoryName: "ダイニングチェア", ParentCategoryName: "家庭用チェア"},
+		6:  {ID: 10, ParentID: 0, CategoryName: "家庭用チェア", ParentCategoryName: ""},
+		7:  {ID: 11, ParentID: 10, CategoryName: "スツール", ParentCategoryName: "家庭用チェア"},
+		8:  {ID: 12, ParentID: 10, CategoryName: "クッションスツール", ParentCategoryName: "家庭用チェア"},
+		9:  {ID: 13, ParentID: 10, CategoryName: "ダイニングチェア", ParentCategoryName: "家庭用チェア"},
 		10: {ID: 14, ParentID: 10, CategoryName: "リビングチェア", ParentCategoryName: "家庭用チェア"},
 		11: {ID: 15, ParentID: 10, CategoryName: "カウンターチェア", ParentCategoryName: "家庭用チェア"},
 		12: {ID: 20, ParentID: 0, CategoryName: "キッズチェア", ParentCategoryName: ""},
