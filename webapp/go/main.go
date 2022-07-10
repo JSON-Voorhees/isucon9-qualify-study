@@ -1145,16 +1145,16 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			wg.Add(1)
-			go func(reserveID string, evidenceID int64) {
+			go func(reserveID string, itemID int64) {
 				ssr, err := APIShipmentStatus(getShipmentServiceURL(), &APIShipmentStatusReq{
 					ReserveID: reserveID,
 				})
 				ch <- &ShipmentResult{
-					evidenceID: evidenceID,
+					evidenceID: itemID,
 					res:        ssr,
 					err:        err,
 				}
-			}(shipping.ReserveID, transactionEvidence.ID)
+			}(shipping.ReserveID, item.ID)
 
 			itemDetail.TransactionEvidenceID = transactionEvidence.ID
 			itemDetail.TransactionEvidenceStatus = transactionEvidence.Status
@@ -1175,7 +1175,7 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	for i := range itemDetails {
-		itemDetails[i].ShippingStatus = results[itemDetails[i].TransactionEvidenceID].Status
+		itemDetails[i].ShippingStatus = results[itemDetails[i].ID].Status
 	}
 	tx.Commit()
 
