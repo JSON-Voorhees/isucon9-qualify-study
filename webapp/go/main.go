@@ -1066,9 +1066,9 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 	itemDetails := []ItemDetail{}
 
 	type ShipmentResult struct {
-		evidenceID int64
-		res        *APIShipmentStatusRes
-		err        error
+		itemID int64
+		res    *APIShipmentStatusRes
+		err    error
 	}
 	results := map[int64]*APIShipmentStatusRes{}
 	var lastErr error
@@ -1082,7 +1082,7 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 				wg.Done()
 				continue
 			}
-			results[res.evidenceID] = res.res
+			results[res.itemID] = res.res
 			wg.Done()
 		}
 	}()
@@ -1094,6 +1094,7 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 			tx.Rollback()
 			return
 		}
+		log.Printf("itemID: %d\n", item.ID)
 
 		itemDetail := ItemDetail{
 			ID:       item.ID,
@@ -1149,10 +1150,11 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 				ssr, err := APIShipmentStatus(getShipmentServiceURL(), &APIShipmentStatusReq{
 					ReserveID: reserveID,
 				})
+				log.Printf("itemID: %d\n", itemID)
 				ch <- &ShipmentResult{
-					evidenceID: itemID,
-					res:        ssr,
-					err:        err,
+					itemID: itemID,
+					res:    ssr,
+					err:    err,
 				}
 			}(shipping.ReserveID, item.ID)
 
