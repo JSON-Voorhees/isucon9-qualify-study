@@ -410,7 +410,7 @@ func getUserSimpleByID(q sqlx.Queryer, userID int64) (userSimple UserSimple, err
 
 func getUserByUserIdList(q sqlx.Queryer, userIdList []string) (userSimples []UserSimple, err error) {
 	users := []UserSimple{}
-	err = sqlx.Select(q, &users, "SELECT * FROM `users` WHERE `id` in ?", "("+strings.Join(userIdList, ",")+")")
+	err = sqlx.Select(q, &users, "SELECT * FROM `users` WHERE `id` in ("+strings.Join(userIdList, ",")+")")
 
 	return users, err
 }
