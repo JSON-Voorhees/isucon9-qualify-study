@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	_ "net/http/pprof"
@@ -1063,6 +1064,28 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 	}
 
 	itemDetails := []ItemDetail{}
+
+	type ShipmentResult struct {
+		evidenceID int64
+		res        *APIShipmentStatusRes
+		err        error
+	}
+	results := map[int64]*APIShipmentStatusRes{}
+	var lastErr error
+	ch := make(chan *ShipmentResult)
+	wg := &sync.WaitGroup{}
+	go func() {
+		for {
+			res := <-ch
+			if res.err != nil {
+				lastErr = res.err
+				wg.Done()
+				continue
+			}
+			results[res.evidenceID] = res.res
+			wg.Done()
+		}
+	}()
 	for _, item := range items {
 		seller := sellersMap[item.SellerID]
 		category, err := getCategoryByID(tx, item.CategoryID)
@@ -1121,22 +1144,32 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 				tx.Rollback()
 				return
 			}
-			ssr, err := APIShipmentStatus(getShipmentServiceURL(), &APIShipmentStatusReq{
-				ReserveID: shipping.ReserveID,
-			})
-			if err != nil {
-				log.Print(err)
-				outputErrorMsg(w, http.StatusInternalServerError, "failed to request to shipment service")
-				tx.Rollback()
-				return
-			}
-
+			go func() {
+				wg.Add(1)
+				ssr, err := APIShipmentStatus(getShipmentServiceURL(), &APIShipmentStatusReq{
+					ReserveID: shipping.ReserveID,
+				})
+				ch <- &ShipmentResult{
+					evidenceID: transactionEvidence.ID,
+					res:        ssr,
+					err:        err,
+				}
+			}()
 			itemDetail.TransactionEvidenceID = transactionEvidence.ID
 			itemDetail.TransactionEvidenceStatus = transactionEvidence.Status
-			itemDetail.ShippingStatus = ssr.Status
 		}
 
 		itemDetails = append(itemDetails, itemDetail)
+	}
+	wg.Wait()
+	if lastErr != nil {
+		log.Print(lastErr)
+		outputErrorMsg(w, http.StatusInternalServerError, "failed to request to shipment service: "+lastErr.Error())
+		tx.Rollback()
+		return
+	}
+	for i := range itemDetails {
+		itemDetails[i].ShippingStatus = results[itemDetails[i].TransactionEvidenceID].Status
 	}
 	tx.Commit()
 
