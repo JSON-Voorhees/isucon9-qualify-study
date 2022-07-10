@@ -1094,7 +1094,6 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 			tx.Rollback()
 			return
 		}
-		log.Printf("itemID: %d\n", item.ID)
 
 		itemDetail := ItemDetail{
 			ID:       item.ID,
@@ -1150,7 +1149,6 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 				ssr, err := APIShipmentStatus(getShipmentServiceURL(), &APIShipmentStatusReq{
 					ReserveID: reserveID,
 				})
-				log.Printf("itemID: %d\n", itemID)
 				ch <- &ShipmentResult{
 					itemID: itemID,
 					res:    ssr,
@@ -1165,11 +1163,7 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 		itemDetails = append(itemDetails, itemDetail)
 	}
 	wg.Wait()
-	log.Printf("results: %+v\n", results)
 
-	for i := range itemDetails {
-		log.Printf("item[%d] = %+v\n", i, itemDetails[i])
-	}
 	if lastErr != nil {
 		log.Print(lastErr)
 		outputErrorMsg(w, http.StatusInternalServerError, "failed to request to shipment service: "+lastErr.Error())
