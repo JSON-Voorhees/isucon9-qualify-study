@@ -492,7 +492,7 @@ func getConfigByName(name string) (string, error) {
 	// 	return "", err
 	// }
 	// return config.Val, err
-	return c, err
+	return c, nil
 }
 
 func getPaymentServiceURL() string {
