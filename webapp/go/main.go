@@ -4,6 +4,7 @@ import (
 	crand "crypto/rand"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
 	"io/ioutil"
@@ -14,7 +15,10 @@ import (
 	"path/filepath"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
+
+	_ "net/http/pprof"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/gorilla/sessions"
@@ -280,6 +284,10 @@ func init() {
 }
 
 func main() {
+	go func() {
+		log.Print(http.ListenAndServe("localhost:6060", nil))
+	}()
+
 	host := os.Getenv("MYSQL_HOST")
 	if host == "" {
 		host = "127.0.0.1"
@@ -408,16 +416,88 @@ func getUserSimpleByID(q sqlx.Queryer, userID int64) (userSimple UserSimple, err
 	return userSimple, err
 }
 
-func getCategoryByID(q sqlx.Queryer, categoryID int) (category Category, err error) {
-	err = sqlx.Get(q, &category, "SELECT * FROM `categories` WHERE `id` = ?", categoryID)
-	if category.ParentID != 0 {
-		parentCategory, err := getCategoryByID(q, category.ParentID)
-		if err != nil {
-			return category, err
-		}
-		category.ParentCategoryName = parentCategory.CategoryName
+func getUserMapByUserIdList(q sqlx.Queryer, userIdList []string) (userSimplesMap map[int64]UserSimple, err error) {
+	if len(userIdList) == 0 {
+		return map[int64]UserSimple{}, nil
 	}
-	return category, err
+
+	users := []User{}
+	err = sqlx.Select(q, &users, "SELECT * FROM `users` WHERE `id` in ("+strings.Join(userIdList, ",")+")")
+
+	userSimplesMap = make(map[int64]UserSimple, len(users))
+	for _, user := range users {
+		userSimplesMap[user.ID] = UserSimple{
+			ID:           user.ID,
+			AccountName:  user.AccountName,
+			NumSellItems: user.NumSellItems,
+		}
+	}
+
+	return userSimplesMap, err
+}
+
+func getCategoryByID(q sqlx.Queryer, categoryID int) (category Category, err error) {
+
+	CategoryListByID := map[int]Category{
+		1:  {ID: 1, ParentID: 0, CategoryName: "ソファー", ParentCategoryName: ""},
+		2:  {ID: 2, ParentID: 1, CategoryName: "一人掛けソファー", ParentCategoryName: "ソファー"},
+		3:  {ID: 3, ParentID: 1, CategoryName: "二人掛けソファー", ParentCategoryName: "ソファー"},
+		4:  {ID: 4, ParentID: 1, CategoryName: "コーナーソファー", ParentCategoryName: "ソファー"},
+		5:  {ID: 5, ParentID: 1, CategoryName: "二段ソファー", ParentCategoryName: "ソファー"},
+		6:  {ID: 6, ParentID: 1, CategoryName: "ソファーベッド", ParentCategoryName: "ソファー"},
+		10: {ID: 10, ParentID: 0, CategoryName: "家庭用チェア", ParentCategoryName: ""},
+		11: {ID: 11, ParentID: 10, CategoryName: "スツール", ParentCategoryName: "家庭用チェア"},
+		12: {ID: 12, ParentID: 10, CategoryName: "クッションスツール", ParentCategoryName: "家庭用チェア"},
+		13: {ID: 13, ParentID: 10, CategoryName: "ダイニングチェア", ParentCategoryName: "家庭用チェア"},
+		14: {ID: 14, ParentID: 10, CategoryName: "リビングチェア", ParentCategoryName: "家庭用チェア"},
+		15: {ID: 15, ParentID: 10, CategoryName: "カウンターチェア", ParentCategoryName: "家庭用チェア"},
+		20: {ID: 20, ParentID: 0, CategoryName: "キッズチェア", ParentCategoryName: ""},
+		21: {ID: 21, ParentID: 20, CategoryName: "学習チェア", ParentCategoryName: "キッズチェア"},
+		22: {ID: 22, ParentID: 20, CategoryName: "ベビーソファ", ParentCategoryName: "キッズチェア"},
+		23: {ID: 23, ParentID: 20, CategoryName: "キッズハイチェア", ParentCategoryName: "キッズチェア"},
+		24: {ID: 24, ParentID: 20, CategoryName: "テーブルチェア", ParentCategoryName: "キッズチェア"},
+		30: {ID: 30, ParentID: 0, CategoryName: "オフィスチェア", ParentCategoryName: ""},
+		31: {ID: 31, ParentID: 30, CategoryName: "デスクチェア", ParentCategoryName: "オフィスチェア"},
+		32: {ID: 32, ParentID: 30, CategoryName: "ビジネスチェア", ParentCategoryName: "オフィスチェア"},
+		33: {ID: 33, ParentID: 30, CategoryName: "回転チェア", ParentCategoryName: "オフィスチェア"},
+		34: {ID: 34, ParentID: 30, CategoryName: "リクライニングチェア", ParentCategoryName: "オフィスチェア"},
+		35: {ID: 35, ParentID: 30, CategoryName: "投擲用椅子", ParentCategoryName: "オフィスチェア"},
+		40: {ID: 40, ParentID: 0, CategoryName: "折りたたみ椅子", ParentCategoryName: ""},
+		41: {ID: 41, ParentID: 40, CategoryName: "パイプ椅子", ParentCategoryName: "折りたたみ椅子"},
+		42: {ID: 42, ParentID: 40, CategoryName: "木製折りたたみ椅子", ParentCategoryName: "折りたたみ椅子"},
+		43: {ID: 43, ParentID: 40, CategoryName: "キッチンチェア", ParentCategoryName: "折りたたみ椅子"},
+		44: {ID: 44, ParentID: 40, CategoryName: "アウトドアチェア", ParentCategoryName: "折りたたみ椅子"},
+		45: {ID: 45, ParentID: 40, CategoryName: "作業椅子", ParentCategoryName: "折りたたみ椅子"},
+		50: {ID: 50, ParentID: 0, CategoryName: "ベンチ", ParentCategoryName: ""},
+		51: {ID: 51, ParentID: 50, CategoryName: "一人掛けベンチ", ParentCategoryName: "ベンチ"},
+		52: {ID: 52, ParentID: 50, CategoryName: "二人掛けベンチ", ParentCategoryName: "ベンチ"},
+		53: {ID: 53, ParentID: 50, CategoryName: "アウトドア用ベンチ", ParentCategoryName: "ベンチ"},
+		54: {ID: 54, ParentID: 50, CategoryName: "収納付きベンチ", ParentCategoryName: "ベンチ"},
+		55: {ID: 55, ParentID: 50, CategoryName: "背もたれ付きベンチ", ParentCategoryName: "ベンチ"},
+		56: {ID: 56, ParentID: 50, CategoryName: "ベンチマーク", ParentCategoryName: "ベンチ"},
+		60: {ID: 60, ParentID: 0, CategoryName: "座椅子", ParentCategoryName: ""},
+		61: {ID: 61, ParentID: 60, CategoryName: "和風座椅子", ParentCategoryName: "座椅子"},
+		62: {ID: 62, ParentID: 60, CategoryName: "高座椅子", ParentCategoryName: "座椅子"},
+		63: {ID: 63, ParentID: 60, CategoryName: "ゲーミング座椅子", ParentCategoryName: "座椅子"},
+		64: {ID: 64, ParentID: 60, CategoryName: "ロッキングチェア", ParentCategoryName: "座椅子"},
+		65: {ID: 65, ParentID: 60, CategoryName: "座布団", ParentCategoryName: "座椅子"},
+		66: {ID: 66, ParentID: 60, CategoryName: "空気椅子", ParentCategoryName: "座椅子"},
+	}
+
+	// err = sqlx.Get(q, &category, "SELECT * FROM `categories` WHERE `id` = ?", categoryID)
+	// if category.ParentID != 0 {
+	// 	parentCategory, err := getCategoryByID(q, category.ParentID)
+	// 	if err != nil {
+	// 		return category, err
+	// 	}
+	// 	category.ParentCategoryName = parentCategory.CategoryName
+	// }
+
+	c, ok := CategoryListByID[categoryID]
+	if !ok {
+		return Category{}, errors.New("not found")
+	}
+	return c, err
 }
 
 func getConfigByName(name string) (string, error) {
@@ -558,13 +638,23 @@ func getNewItems(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// 検索用userIdのリスト作成
+	sellerIdList := make([]string, len(items))
+	for idx, item := range items {
+		sellerIdList[idx] = strconv.FormatInt(item.SellerID, 10)
+	}
+
+	// userの取得
+	sellersMap, err := getUserMapByUserIdList(dbx, sellerIdList)
+	if err != nil {
+		outputErrorMsg(w, http.StatusNotFound, "seller not found:"+err.Error())
+		return
+	}
+
 	itemSimples := []ItemSimple{}
 	for _, item := range items {
-		seller, err := getUserSimpleByID(dbx, item.SellerID)
-		if err != nil {
-			outputErrorMsg(w, http.StatusNotFound, "seller not found")
-			return
-		}
+		seller := sellersMap[item.SellerID]
+
 		category, err := getCategoryByID(dbx, item.CategoryID)
 		if err != nil {
 			outputErrorMsg(w, http.StatusNotFound, "category not found")
@@ -600,6 +690,18 @@ func getNewItems(w http.ResponseWriter, r *http.Request) {
 }
 
 func getNewCategoryItems(w http.ResponseWriter, r *http.Request) {
+
+	CategoryListByParentId := map[int][]int{
+		0:  []int{10, 20, 30, 40, 50, 60},
+		1:  []int{2, 3, 4, 5, 6},
+		10: []int{11, 12, 13, 14, 15},
+		20: []int{21, 22, 23, 24},
+		30: []int{31, 32, 33, 34, 35},
+		40: []int{41, 42, 43, 44, 45},
+		50: []int{51, 52, 53, 54, 55, 56},
+		60: []int{61, 62, 63, 64, 65, 66},
+	}
+
 	rootCategoryIDStr := pat.Param(r, "root_category_id")
 	rootCategoryID, err := strconv.Atoi(rootCategoryIDStr)
 	if err != nil || rootCategoryID <= 0 {
@@ -613,13 +715,14 @@ func getNewCategoryItems(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var categoryIDs []int
-	err = dbx.Select(&categoryIDs, "SELECT id FROM `categories` WHERE parent_id=?", rootCategory.ID)
-	if err != nil {
-		log.Print(err)
-		outputErrorMsg(w, http.StatusInternalServerError, "db error")
-		return
-	}
+	// var categoryIDs []int
+	// err = dbx.Select(&categoryIDs, "SELECT id FROM `categories` WHERE parent_id=?", rootCategory.ID)
+	// if err != nil {
+	// 	log.Print(err)
+	// 	outputErrorMsg(w, http.StatusInternalServerError, "db error")
+	// 	return
+	// }
+	categoryIDs := CategoryListByParentId[rootCategory.ID]
 
 	query := r.URL.Query()
 	itemIDStr := query.Get("item_id")
@@ -686,13 +789,22 @@ func getNewCategoryItems(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 検索用userIdのリスト作成
+	sellerIdList := make([]string, len(items))
+	for idx, item := range items {
+		sellerIdList[idx] = strconv.FormatInt(item.SellerID, 10)
+	}
+
+	// userの取得
+	sellersMap, err := getUserMapByUserIdList(dbx, sellerIdList)
+	if err != nil {
+		outputErrorMsg(w, http.StatusNotFound, "seller not found:"+err.Error())
+		return
+	}
+
 	itemSimples := []ItemSimple{}
 	for _, item := range items {
-		seller, err := getUserSimpleByID(dbx, item.SellerID)
-		if err != nil {
-			outputErrorMsg(w, http.StatusNotFound, "seller not found")
-			return
-		}
+		seller := sellersMap[item.SellerID]
 		category, err := getCategoryByID(dbx, item.CategoryID)
 		if err != nil {
 			outputErrorMsg(w, http.StatusNotFound, "category not found")
@@ -928,14 +1040,33 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 		items = items[0 : TransactionsPerPage+1]
 	}
 
+	// 検索用userIdのリスト作成
+	sellerIdList := make([]string, len(items))
+	buyerIdList := make([]string, 0, len(items))
+	for idx, item := range items {
+		sellerIdList[idx] = strconv.FormatInt(item.SellerID, 10)
+		if item.BuyerID != 0 {
+			buyerIdList = append(buyerIdList, strconv.FormatInt(item.BuyerID, 10))
+		}
+	}
+
+	// userの取得
+	sellersMap, err := getUserMapByUserIdList(dbx, sellerIdList)
+	if err != nil {
+		outputErrorMsg(w, http.StatusNotFound, "seller not found:"+err.Error())
+		tx.Rollback()
+		return
+	}
+	buyersMap, err := getUserMapByUserIdList(dbx, buyerIdList)
+	if err != nil {
+		outputErrorMsg(w, http.StatusNotFound, "buyer not found:"+err.Error())
+		tx.Rollback()
+		return
+	}
+
 	itemDetails := []ItemDetail{}
 	for _, item := range items {
-		seller, err := getUserSimpleByID(tx, item.SellerID)
-		if err != nil {
-			outputErrorMsg(w, http.StatusNotFound, "seller not found")
-			tx.Rollback()
-			return
-		}
+		seller := sellersMap[item.SellerID]
 		category, err := getCategoryByID(tx, item.CategoryID)
 		if err != nil {
 			outputErrorMsg(w, http.StatusNotFound, "category not found")
@@ -963,12 +1094,7 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if item.BuyerID != 0 {
-			buyer, err := getUserSimpleByID(tx, item.BuyerID)
-			if err != nil {
-				outputErrorMsg(w, http.StatusNotFound, "buyer not found")
-				tx.Rollback()
-				return
-			}
+			buyer := buyersMap[item.BuyerID]
 			itemDetail.BuyerID = item.BuyerID
 			itemDetail.Buyer = &buyer
 		}
@@ -2168,14 +2294,58 @@ func getSettings(w http.ResponseWriter, r *http.Request) {
 
 	ress.PaymentServiceURL = getPaymentServiceURL()
 
-	categories := []Category{}
-
-	err := dbx.Select(&categories, "SELECT * FROM `categories`")
-	if err != nil {
-		log.Print(err)
-		outputErrorMsg(w, http.StatusInternalServerError, "db error")
-		return
+	// categories := []Category{}
+	categories := []Category{
+		{ID: 1, ParentID: 0, CategoryName: "ソファー", ParentCategoryName: ""},
+		{ID: 2, ParentID: 1, CategoryName: "一人掛けソファー", ParentCategoryName: "ソファー"},
+		{ID: 3, ParentID: 1, CategoryName: "二人掛けソファー", ParentCategoryName: "ソファー"},
+		{ID: 4, ParentID: 1, CategoryName: "コーナーソファー", ParentCategoryName: "ソファー"},
+		{ID: 5, ParentID: 1, CategoryName: "二段ソファー", ParentCategoryName: "ソファー"},
+		{ID: 6, ParentID: 1, CategoryName: "ソファーベッド", ParentCategoryName: "ソファー"},
+		{ID: 10, ParentID: 0, CategoryName: "家庭用チェア", ParentCategoryName: ""},
+		{ID: 11, ParentID: 10, CategoryName: "スツール", ParentCategoryName: "家庭用チェア"},
+		{ID: 12, ParentID: 10, CategoryName: "クッションスツール", ParentCategoryName: "家庭用チェア"},
+		{ID: 13, ParentID: 10, CategoryName: "ダイニングチェア", ParentCategoryName: "家庭用チェア"},
+		{ID: 14, ParentID: 10, CategoryName: "リビングチェア", ParentCategoryName: "家庭用チェア"},
+		{ID: 15, ParentID: 10, CategoryName: "カウンターチェア", ParentCategoryName: "家庭用チェア"},
+		{ID: 20, ParentID: 0, CategoryName: "キッズチェア", ParentCategoryName: ""},
+		{ID: 21, ParentID: 20, CategoryName: "学習チェア", ParentCategoryName: "キッズチェア"},
+		{ID: 22, ParentID: 20, CategoryName: "ベビーソファ", ParentCategoryName: "キッズチェア"},
+		{ID: 23, ParentID: 20, CategoryName: "キッズハイチェア", ParentCategoryName: "キッズチェア"},
+		{ID: 24, ParentID: 20, CategoryName: "テーブルチェア", ParentCategoryName: "キッズチェア"},
+		{ID: 30, ParentID: 0, CategoryName: "オフィスチェア", ParentCategoryName: ""},
+		{ID: 31, ParentID: 30, CategoryName: "デスクチェア", ParentCategoryName: "オフィスチェア"},
+		{ID: 32, ParentID: 30, CategoryName: "ビジネスチェア", ParentCategoryName: "オフィスチェア"},
+		{ID: 33, ParentID: 30, CategoryName: "回転チェア", ParentCategoryName: "オフィスチェア"},
+		{ID: 34, ParentID: 30, CategoryName: "リクライニングチェア", ParentCategoryName: "オフィスチェア"},
+		{ID: 35, ParentID: 30, CategoryName: "投擲用椅子", ParentCategoryName: "オフィスチェア"},
+		{ID: 40, ParentID: 0, CategoryName: "折りたたみ椅子", ParentCategoryName: ""},
+		{ID: 41, ParentID: 40, CategoryName: "パイプ椅子", ParentCategoryName: "折りたたみ椅子"},
+		{ID: 42, ParentID: 40, CategoryName: "木製折りたたみ椅子", ParentCategoryName: "折りたたみ椅子"},
+		{ID: 43, ParentID: 40, CategoryName: "キッチンチェア", ParentCategoryName: "折りたたみ椅子"},
+		{ID: 44, ParentID: 40, CategoryName: "アウトドアチェア", ParentCategoryName: "折りたたみ椅子"},
+		{ID: 45, ParentID: 40, CategoryName: "作業椅子", ParentCategoryName: "折りたたみ椅子"},
+		{ID: 50, ParentID: 0, CategoryName: "ベンチ", ParentCategoryName: ""},
+		{ID: 51, ParentID: 50, CategoryName: "一人掛けベンチ", ParentCategoryName: "ベンチ"},
+		{ID: 52, ParentID: 50, CategoryName: "二人掛けベンチ", ParentCategoryName: "ベンチ"},
+		{ID: 53, ParentID: 50, CategoryName: "アウトドア用ベンチ", ParentCategoryName: "ベンチ"},
+		{ID: 54, ParentID: 50, CategoryName: "収納付きベンチ", ParentCategoryName: "ベンチ"},
+		{ID: 55, ParentID: 50, CategoryName: "背もたれ付きベンチ", ParentCategoryName: "ベンチ"},
+		{ID: 56, ParentID: 50, CategoryName: "ベンチマーク", ParentCategoryName: "ベンチ"},
+		{ID: 60, ParentID: 0, CategoryName: "座椅子", ParentCategoryName: ""},
+		{ID: 61, ParentID: 60, CategoryName: "和風座椅子", ParentCategoryName: "座椅子"},
+		{ID: 62, ParentID: 60, CategoryName: "高座椅子", ParentCategoryName: "座椅子"},
+		{ID: 63, ParentID: 60, CategoryName: "ゲーミング座椅子", ParentCategoryName: "座椅子"},
+		{ID: 64, ParentID: 60, CategoryName: "ロッキングチェア", ParentCategoryName: "座椅子"},
+		{ID: 65, ParentID: 60, CategoryName: "座布団", ParentCategoryName: "座椅子"},
+		{ID: 66, ParentID: 60, CategoryName: "空気椅子", ParentCategoryName: "座椅子"},
 	}
+	// err := dbx.Select(&categories, "SELECT * FROM `categories`")
+	// if err != nil {
+	// 	log.Print(err)
+	// 	outputErrorMsg(w, http.StatusInternalServerError, "db error")
+	// 	return
+	// }
 	ress.Categories = categories
 
 	w.Header().Set("Content-Type", "application/json;charset=utf-8")
