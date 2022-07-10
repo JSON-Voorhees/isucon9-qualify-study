@@ -24,6 +24,7 @@ import (
 )
 
 const (
+	// test
 	sessionName = "session_isucari"
 
 	DefaultPaymentServiceURL  = "http://localhost:5555"
