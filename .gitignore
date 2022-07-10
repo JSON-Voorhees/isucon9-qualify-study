@@ -1,0 +1,4 @@
+initial-data/
+webapp/public/upload/
+bin/
+webapp/sql/initial.sql
