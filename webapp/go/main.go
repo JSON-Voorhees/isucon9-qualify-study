@@ -410,7 +410,7 @@ func getUserSimpleByID(q sqlx.Queryer, userID int64) (userSimple UserSimple, err
 
 func getUserByUserIdList(q sqlx.Queryer, userIdList []string) (userSimples []UserSimple, err error) {
 	users := []UserSimple{}
-	err = sqlx.Select(q, &users, "SELECT * FROM `users` WHERE `id` in ?", strings.Join(userIdList, ","))
+	err = sqlx.Select(q, &users, "SELECT * FROM `users` WHERE `id` in ?", "("+strings.Join(userIdList, ",")+")")
 
 	return users, err
 }
@@ -573,6 +573,10 @@ func getNewItems(w http.ResponseWriter, r *http.Request) {
 
 	// userの取得
 	sellers, err := getUserByUserIdList(dbx, sellerIdList)
+	if err != nil {
+		outputErrorMsg(w, http.StatusNotFound, "seller not found")
+		return
+	}
 
 	// MAP化
 	sellersMap := make(map[int64]UserSimple, len(sellers))
@@ -713,6 +717,10 @@ func getNewCategoryItems(w http.ResponseWriter, r *http.Request) {
 
 	// userの取得
 	sellers, err := getUserByUserIdList(dbx, sellerIdList)
+	if err != nil {
+		outputErrorMsg(w, http.StatusNotFound, "seller not found")
+		return
+	}
 
 	// MAP化
 	sellersMap := make(map[int64]UserSimple, len(sellers))
@@ -955,8 +963,17 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 
 	// userの取得
 	sellers, err := getUserByUserIdList(dbx, sellerIdList)
+	if err != nil {
+		outputErrorMsg(w, http.StatusNotFound, "seller not found")
+		tx.Rollback()
+		return
+	}
 	buyers, err := getUserByUserIdList(dbx, buyerIdList)
-
+	if err != nil {
+		outputErrorMsg(w, http.StatusNotFound, "buyer not found")
+		tx.Rollback()
+		return
+	}
 	// MAP化
 	sellersMap := make(map[int64]UserSimple, len(sellers))
 	for _, seller := range sellers {
