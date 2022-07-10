@@ -1177,7 +1177,9 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	for i := range itemDetails {
-		itemDetails[i].ShippingStatus = results[itemDetails[i].ID].Status
+		if itemDetails[i].TransactionEvidenceID > 0 {
+			itemDetails[i].ShippingStatus = results[itemDetails[i].ID].Status
+		}
 	}
 	tx.Commit()
 
