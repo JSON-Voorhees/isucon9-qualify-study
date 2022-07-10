@@ -60,6 +60,13 @@ const (
 	BcryptCost = 10
 )
 
+var {
+	config = map[string]string{
+		"payment_service_url": DefaultPaymentServiceURL,
+		"shipment_service_url": DefaultShipmentServiceURL,
+	}
+}
+
 var (
 	templates *template.Template
 	dbx       *sqlx.DB
@@ -473,16 +480,21 @@ func getCategoryByID(q sqlx.Queryer, categoryID int) (category Category, err err
 }
 
 func getConfigByName(name string) (string, error) {
-	config := Config{}
-	err := dbx.Get(&config, "SELECT * FROM `configs` WHERE `name` = ?", name)
-	if err == sql.ErrNoRows {
-		return "", nil
+	c, ok := config[name]
+	if !ok {
+		return "", errors.New("not found")
 	}
-	if err != nil {
-		log.Print(err)
-		return "", err
-	}
-	return config.Val, err
+	// config := Config{}
+	// err := dbx.Get(&config, "SELECT * FROM `configs` WHERE `name` = ?", name)
+	// if err == sql.ErrNoRows {
+	// 	return "", nil
+	// }
+	// if err != nil {
+	// 	log.Print(err)
+	// 	return "", err
+	// }
+	// return config.Val, err
+	return c, err
 }
 
 func getPaymentServiceURL() string {
@@ -543,6 +555,10 @@ func postInitialize(w http.ResponseWriter, r *http.Request) {
 		outputErrorMsg(w, http.StatusInternalServerError, "db error")
 		return
 	}
+
+	// キャッシュにのせる
+	config["payment_service_url"]  = ri.PaymentServiceURL
+	config["shipment_service_url"] = ri.ShipmentServiceURL
 
 	res := resInitialize{
 		// キャンペーン実施時には還元率の設定を返す。詳しくはマニュアルを参照のこと。
