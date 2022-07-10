@@ -408,11 +408,20 @@ func getUserSimpleByID(q sqlx.Queryer, userID int64) (userSimple UserSimple, err
 	return userSimple, err
 }
 
-func getUserByUserIdList(q sqlx.Queryer, userIdList []string) (userSimples []UserSimple, err error) {
-	users := []UserSimple{}
+func getUserMapByUserIdList(q sqlx.Queryer, userIdList []string) (userSimplesMap map[int64]UserSimple, err error) {
+	users := []User{}
 	err = sqlx.Select(q, &users, "SELECT * FROM `users` WHERE `id` in ("+strings.Join(userIdList, ",")+")")
 
-	return users, err
+	userSimplesMap = make(map[int64]UserSimple, len(users))
+	for _, user := range users {
+		userSimplesMap[user.ID] = UserSimple{
+			ID:           user.ID,
+			AccountName:  user.AccountName,
+			NumSellItems: user.NumSellItems,
+		}
+	}
+
+	return userSimplesMap, err
 }
 
 func getCategoryByID(q sqlx.Queryer, categoryID int) (category Category, err error) {
@@ -572,16 +581,10 @@ func getNewItems(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// userの取得
-	sellers, err := getUserByUserIdList(dbx, sellerIdList)
+	sellersMap, err := getUserMapByUserIdList(dbx, sellerIdList)
 	if err != nil {
 		outputErrorMsg(w, http.StatusNotFound, "seller not found:"+err.Error())
 		return
-	}
-
-	// MAP化
-	sellersMap := make(map[int64]UserSimple, len(sellers))
-	for _, seller := range sellers {
-		sellersMap[seller.ID] = seller
 	}
 
 	itemSimples := []ItemSimple{}
@@ -716,16 +719,10 @@ func getNewCategoryItems(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// userの取得
-	sellers, err := getUserByUserIdList(dbx, sellerIdList)
+	sellersMap, err := getUserMapByUserIdList(dbx, sellerIdList)
 	if err != nil {
 		outputErrorMsg(w, http.StatusNotFound, "seller not found:"+err.Error())
 		return
-	}
-
-	// MAP化
-	sellersMap := make(map[int64]UserSimple, len(sellers))
-	for _, seller := range sellers {
-		sellersMap[seller.ID] = seller
 	}
 
 	itemSimples := []ItemSimple{}
@@ -962,26 +959,17 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// userの取得
-	sellers, err := getUserByUserIdList(dbx, sellerIdList)
+	sellersMap, err := getUserMapByUserIdList(dbx, sellerIdList)
 	if err != nil {
 		outputErrorMsg(w, http.StatusNotFound, "seller not found:"+err.Error())
 		tx.Rollback()
 		return
 	}
-	buyers, err := getUserByUserIdList(dbx, buyerIdList)
+	buyersMap, err := getUserMapByUserIdList(dbx, buyerIdList)
 	if err != nil {
 		outputErrorMsg(w, http.StatusNotFound, "buyer not found:"+err.Error())
 		tx.Rollback()
 		return
-	}
-	// MAP化
-	sellersMap := make(map[int64]UserSimple, len(sellers))
-	for _, seller := range sellers {
-		sellersMap[seller.ID] = seller
-	}
-	buyersMap := make(map[int64]UserSimple, len(buyers))
-	for _, buyer := range sellers {
-		buyersMap[buyer.ID] = buyer
 	}
 
 	itemDetails := []ItemDetail{}
