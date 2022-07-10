@@ -950,11 +950,11 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 
 	// 検索用userIdのリスト作成
 	sellerIdList := make([]string, len(items))
-	buyerIdList := make([]string, len(items))
+	buyerIdList := make([]string, 0, len(items))
 	for idx, item := range items {
 		sellerIdList[idx] = strconv.FormatInt(item.SellerID, 10)
 		if item.BuyerID != 0 {
-			buyerIdList[idx] = strconv.FormatInt(item.BuyerID, 10)
+			buyerIdList = append(buyerIdList, strconv.FormatInt(item.BuyerID, 10))
 		}
 	}
 
