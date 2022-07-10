@@ -409,6 +409,10 @@ func getUserSimpleByID(q sqlx.Queryer, userID int64) (userSimple UserSimple, err
 }
 
 func getUserMapByUserIdList(q sqlx.Queryer, userIdList []string) (userSimplesMap map[int64]UserSimple, err error) {
+	if len(userIdList) == 0 {
+		return map[int64]UserSimple{}, nil
+	}
+
 	users := []User{}
 	err = sqlx.Select(q, &users, "SELECT * FROM `users` WHERE `id` in ("+strings.Join(userIdList, ",")+")")
 
