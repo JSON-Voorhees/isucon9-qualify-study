@@ -32,7 +32,8 @@ CREATE TABLE `items` (
   `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_created_at (`created_at`),
   INDEX idx_buyer_id (`buyer_id`),
-  INDEX idx_seller_id (`seller_id`)
+  INDEX idx_seller_id (`seller_id`),
+  INDEX idx_status_category_id_created_at (`status`, 'category_id', 'created_at')
 ) ENGINE=InnoDB DEFAULT CHARACTER SET utf8mb4;
 
 DROP TABLE IF EXISTS `transaction_evidences`;
