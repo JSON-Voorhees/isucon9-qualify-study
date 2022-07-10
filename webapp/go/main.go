@@ -1144,17 +1144,18 @@ func getTransactions(w http.ResponseWriter, r *http.Request) {
 				tx.Rollback()
 				return
 			}
-			go func() {
-				wg.Add(1)
+			wg.Add(1)
+			go func(reserveID string, evidenceID int64) {
 				ssr, err := APIShipmentStatus(getShipmentServiceURL(), &APIShipmentStatusReq{
-					ReserveID: shipping.ReserveID,
+					ReserveID: reserveID,
 				})
 				ch <- &ShipmentResult{
-					evidenceID: transactionEvidence.ID,
+					evidenceID: evidenceID,
 					res:        ssr,
 					err:        err,
 				}
-			}()
+			}(shipping.ReserveID, transactionEvidence.ID)
+
 			itemDetail.TransactionEvidenceID = transactionEvidence.ID
 			itemDetail.TransactionEvidenceStatus = transactionEvidence.Status
 		}
