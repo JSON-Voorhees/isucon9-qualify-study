@@ -333,6 +333,12 @@ func main() {
 	}
 	defer dbx.Close()
 
+	// スロークエリを停止
+	_, err = dbx.Exec("SET GLOBAL slow_query_log=0;")
+	if err != nil {
+		log.Fatalf("failed to set slow_query_log=0: %s.", err.Error())
+	}
+
 	mux := goji.NewMux()
 
 	// API
@@ -591,6 +597,12 @@ func postInitialize(w http.ResponseWriter, r *http.Request) {
 		Campaign: 0,
 		// 実装言語を返す
 		Language: "Go",
+	}
+
+	// スロークエリを開始
+	_, err = dbx.Exec("SET GLOBAL slow_query_log=1;")
+	if err != nil {
+		log.Fatalf("failed to set slow_query_log=1: %s.", err.Error())
 	}
 
 	w.Header().Set("Content-Type", "application/json;charset=utf-8")
